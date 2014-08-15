@@ -4,7 +4,7 @@ Written by: Erik Johnson
 
 NOTE:
    - For CCS PIC C, a line such as "#use i2c(I2C1, MASTER, FAST=400000, FORCE_HW, STREAM=I2C_STREAM)" must appear before mcp794xx.h is included
-   - For other compilers, the I2C commands in readMCP794xx, writeMCP794xx, and unlockMCP794xx_EUIblock must be ported to your compiler
+   - For other compilers, the I2C commands in readI2C and writeI2C must be ported to your compiler
 
 TODO: 
    - Oscillator frequency calibration (coarse/fine)
@@ -59,6 +59,8 @@ typedef enum {
 unsigned int8 readMCP794xx(MCP794xx_block, unsigned int8);
 void writeMCP794xx(MCP794xx_block, unsigned int8, unsigned int8);
 void unlockMCP794xx_EUIblock(void);
+unsigned int8 readI2C(unsigned int8, unsigned int8);
+void writeI2C(unsigned int8, unsigned int8, unsigned int8);
 unsigned int8 decodeBCD(unsigned int8);
 unsigned int8 encodeBCD(unsigned int8);
 int1 isLeapYear(unsigned int16);
@@ -287,15 +289,7 @@ unsigned int8 readMCP794xx(MCP794xx_block block, unsigned int8 address) {
       break;
    }
    
-   i2c_start(I2C_STREAM);
-   i2c_write(I2C_STREAM, i2caddress);
-   i2c_write(I2C_STREAM, address);
-   i2c_start(I2C_STREAM);
-   i2c_write(I2C_STREAM, i2caddress | 0x01);
-   result = i2c_read(I2C_STREAM, 0);
-   i2c_stop(I2C_STREAM);
-   
-   return result;
+   return readI2C(i2caddress, address);
 }
 
 /*
@@ -332,11 +326,7 @@ void writeMCP794xx(MCP794xx_block block, unsigned int8 address, unsigned int8 da
       break;
    }
    
-   i2c_start(I2C_STREAM);
-   i2c_write(I2C_STREAM, i2caddress);
-   i2c_write(I2C_STREAM, address);
-   i2c_write(I2C_STREAM, data);
-   i2c_stop(I2C_STREAM);
+   writeI2C(i2caddress, address, data);
 }
 
 /*
@@ -347,15 +337,43 @@ unlockMCP794xx_EUIblock()
    RETURNS:       none
 */
 void unlockMCP794xx_EUIblock() {
+   writeI2C(0xDE, RTC_EEUNLOCK, 0x55);
+   writeI2C(0xDE, RTC_EEUNLOCK, 0xAA);
+}
+
+/*
+readI2C(uint8, uint8)
+
+   DESCRIPTION:   reads a single byte from the I2C bus
+   PARAMETERS:    uint8                - I2C address of the target device
+                  uint8                - register address to read
+   RETURNS:       the byte stored in the specified register
+*/
+unsigned int8 readI2C(unsigned int8 i2caddress, unsigned int8 regaddress) {
    i2c_start(I2C_STREAM);
-   i2c_write(I2C_STREAM, 0xDE);
-   i2c_write(I2C_STREAM, RTC_EEUNLOCK);
-   i2c_write(I2C_STREAM, 0x55);
+   i2c_write(I2C_STREAM, i2caddress);
+   i2c_write(I2C_STREAM, regaddress);
+   i2c_start(I2C_STREAM);
+   i2c_write(I2C_STREAM, i2caddress | 0x01);
+   unsigned int8 result = i2c_read(I2C_STREAM, 0);
    i2c_stop(I2C_STREAM);
+   return result;
+}
+
+/*
+writeI2C(uint8, uint8, uint8)
+
+   DESCRIPTION:   writes a single byte to the I2C bus
+   PARAMETERS:    uint8                - I2C address of the target device
+                  uint8                - register address to write
+                  uint8                - the byte to store in the specified register
+   RETURNS:       none
+*/
+void writeI2C(unsigned int8 i2caddress, unsigned int8 regaddress, unsigned int8 data) {
    i2c_start(I2C_STREAM);
-   i2c_write(I2C_STREAM, 0xDE);
-   i2c_write(I2C_STREAM, RTC_EEUNLOCK);
-   i2c_write(I2C_STREAM, 0xAA);
+   i2c_write(I2C_STREAM, i2caddress);
+   i2c_write(I2C_STREAM, regaddress);
+   i2c_write(I2C_STREAM, data);
    i2c_stop(I2C_STREAM);
 }
 
