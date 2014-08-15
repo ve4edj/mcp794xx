@@ -94,6 +94,7 @@ struct_tm * readRTC(void);
 void writeRTC(struct_tm *);
 int1 isRTCrunning(void);
 int1 hasRTCpowerFailed(void);
+void setBackupSupply(int1);
 void setAlarm(MCP794xx_alarmOffset, MCP794xx_alarmMode, int1, MCP794xx_alarmMask, struct_tm *);
 int1 checkAlarm(MCP794xx_alarmOffset);
 void clearAlarm(MCP794xx_alarmOffset, int1);

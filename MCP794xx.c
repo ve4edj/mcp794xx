@@ -56,21 +56,49 @@ int1 isLeapYear(unsigned int16);
 unsigned int8 daysInMonth(unsigned int8, int1);
 // PRIVATE PROTOTYPES - END
 
+/*
+time()
+
+   DESCRIPTION:   gets the current time from the RTC
+   PARAMETERS:    none
+   RETURNS:       the current date and time stored as time_t
+*/
 time_t time() {
    return mktime(readRTC());
 }
 
+/*
+setTime(struct_tm *)
+
+   DESCRIPTION:   sets the current time, correcting the dayofweek and dayofyear fields
+   PARAMETERS:    struct_tm *          - pointer to the current date and time
+   RETURNS:       none
+*/
 void setTime(struct_tm * nTime) {
    mktime(nTime);
    writeRTC(nTime);
 }
 
+/*
+setTimeEpoch(time_t)
+
+   DESCRIPTION:   sets the current time
+   PARAMETERS:    time_t               - the current epoch time
+   RETURNS:       none
+*/
 void setTimeEpoch(time_t sTime) {
    struct_tm * temp = localtime(&sTime);
    setTime(temp);
    free(temp);
 }
 
+/*
+readRTC()
+
+   DESCRIPTION:   reads the current date and time from the RTC module, updates the local copy of the current time
+   PARAMETERS:    none
+   RETURNS:       pointer to the current date and time stored as struct_tm
+*/
 struct_tm * readRTC() {
    now.tm_sec  = decodeBCD(readMCP794xx(MCP_CLOCK, RTC_SECOND) & 0x7F);
    now.tm_min  = decodeBCD(readMCP794xx(MCP_CLOCK, RTC_MINUTE) & 0x7F);
@@ -82,6 +110,13 @@ struct_tm * readRTC() {
    return &now;
 }
 
+/*
+writeRTC(struct_tm *)
+
+   DESCRIPTION:   writes the current time to the RTC, ensuring that the clock is running
+   PARAMETERS:    struct_tm *          - pointer to the current date and time
+   RETURNS:       none
+*/
 void writeRTC(struct_tm * curr) {
    writeMCP794xx(MCP_CLOCK, RTC_SECOND, encodeBCD(curr->tm_sec) | 0x80);
    writeMCP794xx(MCP_CLOCK, RTC_MINUTE, encodeBCD(curr->tm_min));
@@ -92,18 +127,50 @@ void writeRTC(struct_tm * curr) {
    writeMCP794xx(MCP_CLOCK, RTC_YEAR, encodeBCD(curr->tm_year - YEAR_OFFSET));
 }
 
+/*
+isRTCrunning()
+
+   DESCRIPTION:   checks if the RTC oscillator is running and stable
+   PARAMETERS:    none
+   RETURNS:       a bit indicating the status of the oscillator
+*/
 int1 isRTCrunning() {
    return ((readMCP794xx(MCP_CLOCK, RTC_WEEKDAY) & 0x20) == 0x20);
 }
 
+/*
+hasRTCpowerFailed()
+
+   DESCRIPTION:   checks if the RTC has experienced a power failure since the clock was last set
+   PARAMETERS:    none
+   RETURNS:       a bit indicationg the status of the RTC's power supply since the last clock set
+*/
 int1 hasRTCpowerFailed() {
    return ((readMCP794xx(MCP_CLOCK, RTC_WEEKDAY) & 0x10) == 0x10);
 }
 
-void setBackupSupply(int8 status) {
+/*
+setBackupSupply(int1)
+
+   DESCRIPTION:   enables or disables the Vbat input to the RTC as well as the power fail switchover logic
+   PARAMETERS:    int1                 - enables or disables the backup power system. One of ENABLE or DISABLE
+   RETURNS:       none
+*/
+void setBackupSupply(int1 status) {
    writeMCP794xx(MCP_CLOCK, RTC_WEEKDAY, readMCP794xx(MCP_CLOCK, RTC_WEEKDAY) | (status << 3));
 }
 
+/*
+setAlarm(MCP794xx_alarmOffset, MCP794xx_alarmMode, int1, MCP794xx_alarmMask, struct_tm *)
+
+   DESCRIPTION:   enables or disables the specified alarm modue on the RTC, selects the mode and mask, and sets the alarm match date and time
+   PARAMETERS:    MCP794xx_alarmOffset - selects which alarm is being modified. One of MCP_ALARM0 or MCP_ALARM1
+                  MCP794xx_alarmMode   - selects the mode used to combine alarm signals. One of ALARM_AND or ALARM_NOR (eqivalent to ALARM_ACTLOW or ALARM_ACTHIGH)
+                  int1                 - enables or disables the alarm. One of ENABLE or DISABLE
+                  MCP794xx_alarmMask   - selects the registers used in the comparison to determine if an alarm has occurred. One of MATCH_SECOND, MATCH_MINUTE, MATCH_HOUR, MATCH_WEEKDAY, MATCH_DATE, or MATCH_ALL
+                  struct_tm *          - the date and time to be stored in to the selected alarm's comparison registers
+   RETURNS:       none
+*/
 void setAlarm(MCP794xx_alarmOffset alarm, MCP794xx_alarmMode mode, int1 status, MCP794xx_alarmMask match, struct_tm * curr) {
    if (curr != NULL) {
       writeMCP794xx(MCP_CLOCK, ALM0_SECOND + alarm, encodeBCD(curr->tm_sec));
@@ -118,20 +185,44 @@ void setAlarm(MCP794xx_alarmOffset alarm, MCP794xx_alarmMode mode, int1 status, 
    writeMCP794xx(MCP_CLOCK, RTC_CONTROL, (readMCP794xx(MCP_CLOCK, RTC_CONTROL) & (0xCF | ((alarm == MCP_ALARM1) ? 0x10 : 0x20))) | (((alarm == MCP_ALARM0) ? 0x10 : 0x20) & status));
 }
 
+/*
+checkAlarm(MCP794xx_alarmOffset)
+
+   DESCRIPTION:   checks the status of the specified alarm
+   PARAMETERS:    MCP794xx_alarmOffset - selects which alarm is being checked. One of MCP_ALARM0 or MCP_ALARM1
+   RETURNS:       a bit indicating if the alarm is triggered
+*/
 int1 checkAlarm(MCP794xx_alarmOffset alarm) {
    return ((readMCP794xx(MCP_CLOCK, ALM0_WEEKDAY + alarm) & 0x08) == 0x08);
 }
 
+/*
+clearAlarm(MCP794xx_alarmOffset, int1)
+
+   DESCRIPTION:   clears the specified alarm, and optionally reenables it
+   PARAMETERS:    MCP794xx_alarmOffset - selects which alarm is being cleared. One of MCP_ALARM0 or MCP_ALARM1
+                  int1                 - re-enables or disables the alarm. One of ENABLE or DISABLE
+   RETURNS:       none
+*/
 void clearAlarm(MCP794xx_alarmOffset alarm, int1 reenable) {
    writeMCP794xx(MCP_CLOCK, RTC_CONTROL, (readMCP794xx(MCP_CLOCK, RTC_CONTROL) & (0xCF | ((alarm == MCP_ALARM1) ? 0x10 : 0x20))) | (((alarm == MCP_ALARM0) ? 0x10 : 0x20) & reenable));
    writeMCP794xx(MCP_CLOCK, ALM0_WEEKDAY + alarm, (readMCP794xx(MCP_CLOCK, ALM0_WEEKDAY + alarm) & 0xF7));
 }
 
+/*
+setOutput(int1, int1, MCP794xx_frequency)
+
+   DESCRIPTION:   sets up the MFP output pin of the RTC
+   PARAMETERS:    int1                 - selects the mode of the MFP output (0 - static, 1 - square wave)
+                  int1                 - sets the static output level of the MFP (only valid for squareWave == 0)
+                  MCP794xx_frequency   - selects the output frequency of the MFP (only valid for squareWave == 1). One of SQW_1HZ, SQW_4096HZ, SQW_8192HZ, or SQW_32768HZ
+   RETURNS:       none
+*/
 void setOutput(int1 squareWave, int1 state, MCP794xx_frequency freq) {
    writeMCP794xx(MCP_CLOCK, RTC_CONTROL, (readMCP794xx(MCP_CLOCK, RTC_CONTROL) & 0x38) | (state << 7) | (squareWave << 6) | freq);
 }
 
-// LOW LEVEL HELPER FUNCTIONS
+// LOW LEVEL (HELPER FUNCTIONS)
 
 unsigned int8 decodeBCD(unsigned int8 BCD) {
    return (BCD & 0x0F) + (((BCD & 0xF0) >> 4) * 10);
