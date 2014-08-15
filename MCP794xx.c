@@ -1,6 +1,15 @@
-// TODO: 
-// Oscillator frequency calibration (coarse/fine)
-// Power down/up log (reading/clearing)
+/*
+MCP794xx driver
+Written by: Erik Johnson
+
+NOTE:
+   - For CCS PIC C, a line such as "#use i2c(I2C1, MASTER, FAST=400000, FORCE_HW, STREAM=I2C_STREAM)" must appear before mcp794xx.h is included
+   - For other compilers, the I2C commands in readMCP794xx, writeMCP794xx, and unlockMCP794xx_EUIblock must be ported to your compiler
+
+TODO: 
+   - Oscillator frequency calibration (coarse/fine)
+   - Power down/up log (reading/clearing)
+*/
 
 #include "MCP794xx.h"
 
@@ -222,16 +231,38 @@ void setOutput(int1 squareWave, int1 state, MCP794xx_frequency freq) {
    writeMCP794xx(MCP_CLOCK, RTC_CONTROL, (readMCP794xx(MCP_CLOCK, RTC_CONTROL) & 0x38) | (state << 7) | (squareWave << 6) | freq);
 }
 
-// LOW LEVEL (HELPER FUNCTIONS)
+// -------- LOW LEVEL / HELPER FUNCTIONS --------
 
+/*
+decodeBCD(unsigned int8)
+
+   DESCRIPTION:   takes a BCD integer and returns a standard integer
+   PARAMETERS:    uint8                - the BCD number to convert
+   RETURNS:       the converted integer value
+*/
 unsigned int8 decodeBCD(unsigned int8 BCD) {
    return (BCD & 0x0F) + (((BCD & 0xF0) >> 4) * 10);
 }
 
+/*
+encodeBCD(unsigned int8)
+
+   DESCRIPTION:   takes a standard integer and returns its BCD representation
+   PARAMETERS:    uint8                - the integer to convert
+   RETURNS:       the BCD representation of the value
+*/
 unsigned int8 encodeBCD(unsigned int8 num) {
    return (num % 10) + (((num / 10) & 0x0F) << 4);
 }
 
+/*
+readMCP794xx(MCP794xx_block, uint8)
+
+   DESCRIPTION:   reads a single byte from the MCP794xx
+   PARAMETERS:    MCP794xx_block       - the block to read from. One of MCP_CLOCK, MCP_RAM, MCP_EEPROM, MCP_UID
+                  uint8                - the address within the block
+   RETURNS:       the byte stored at the specified address in the specified block
+*/
 unsigned int8 readMCP794xx(MCP794xx_block block, unsigned int8 address) {
    unsigned int8 result = 0, i2caddress = 0;
    
@@ -267,6 +298,15 @@ unsigned int8 readMCP794xx(MCP794xx_block block, unsigned int8 address) {
    return result;
 }
 
+/*
+writeMCP794xx(MCP794xx_block, uint8, uint8)
+
+   DESCRIPTION:   writes a single byte from the MCP794xx
+   PARAMETERS:    MCP794xx_block       - the block to write to. One of MCP_CLOCK, MCP_RAM, MCP_EEPROM, MCP_UID
+                  uint8                - the address within the block
+                  uint8                - the byte to be written
+   RETURNS:       none
+*/
 void writeMCP794xx(MCP794xx_block block, unsigned int8 address, unsigned int8 data) {
    unsigned int8 i2caddress = 0;
    
@@ -299,6 +339,13 @@ void writeMCP794xx(MCP794xx_block block, unsigned int8 address, unsigned int8 da
    i2c_stop(I2C_STREAM);
 }
 
+/*
+unlockMCP794xx_EUIblock()
+
+   DESCRIPTION:   unlocks the UID block in the MCP794xx to enable writing
+   PARAMETERS:    none
+   RETURNS:       none
+*/
 void unlockMCP794xx_EUIblock() {
    i2c_start(I2C_STREAM);
    i2c_write(I2C_STREAM, 0xDE);
