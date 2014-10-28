@@ -9,6 +9,7 @@ NOTE:
 TODO: 
    - Oscillator frequency calibration (coarse/fine)
    - Power down/up log (reading/clearing)
+   - readMulti / writeMulti (specifically for internal EEPROM)
 */
 
 #include "MCP794xx.h"
